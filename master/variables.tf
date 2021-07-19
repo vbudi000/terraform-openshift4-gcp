@@ -42,7 +42,6 @@ variable "root_volume_size" {
 variable "root_volume_type" {
   type        = string
   description = "The type of volume for the root block device."
-  default     = "pd-ssd"
 }
 
 variable "zones" {

@@ -1,3 +1,8 @@
+data "local_file" "cabundle" {
+  count = var.additional_trust_bundle == "" ? 0 : 1
+  filename = "${var.additional_trust_bundle}"
+}
+
 data "template_file" "install_config_yaml" {
   template = <<EOF
 apiVersion: v1
@@ -43,12 +48,11 @@ EOF
 
 resource "local_file" "install_config_yaml" {
   content  = data.template_file.install_config_yaml.rendered
-  filename = "${local.installer_workspace}/install-config.yaml"
+  filename = "${path.root}/installer-files/install-config.yaml"
   depends_on = [
     null_resource.download_binaries,
   ]
 }
-
 
 data "template_file" "cloud-provider-config" {
   template = <<EOF
@@ -59,8 +63,8 @@ data:
     project-id      = ${var.project_id}
     regional        = true
     multizone       = true
-    node-tags       = ${var.cluster_id}-worker
-    subnetwork-name = ${var.cluster_id}-worker-subnet
+    node-tags       = ${data.local_file.infrastructureID.content}-worker
+    subnetwork-name = ${data.local_file.infrastructureID.content}-worker-subnet
 
 kind: ConfigMap
 metadata:
@@ -72,7 +76,7 @@ EOF
 
 resource "local_file" "cloud-provider-config" {
   content  = data.template_file.cloud-provider-config.rendered
-  filename = "${local.installer_workspace}/manifests/cloud-provider-config.yaml"
+  filename = "${path.root}/installer-files/manifests/cloud-provider-config.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -126,7 +130,7 @@ EOF
 
 resource "local_file" "cluster-config" {
   content  = data.template_file.cluster-config.rendered
-  filename = "${local.installer_workspace}/manifests/cluster-config.yaml"
+  filename = "${path.root}/installer-files/manifests/cluster-config.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -144,7 +148,7 @@ metadata:
 spec:
   baseDomain: ${var.base_domain}
   privateZone:
-    id: ${var.cluster_id}-private-zone
+    id: ${data.local_file.infrastructureID.content}-private-zone
   publicZone:
     id: ${var.public_dns_zone_name}
 status: {}
@@ -153,7 +157,7 @@ EOF
 
 resource "local_file" "cluster-dns-02-config" {
   content  = data.template_file.cluster-dns-02-config.rendered
-  filename = "${local.installer_workspace}/manifests/cluster-dns-02-config.yml"
+  filename = "${path.root}/installer-files/manifests/cluster-dns-02-config.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -175,7 +179,7 @@ status:
   apiServerInternalURI: https://api-int.${var.cluster_name}.${var.base_domain}:6443
   apiServerURL: https://api.${var.cluster_name}.${var.base_domain}:6443
   etcdDiscoveryDomain: ${var.cluster_name}.${var.base_domain}
-  infrastructureName: ${var.cluster_id}
+  infrastructureName: ${data.local_file.infrastructureID.content}
   platform: GCP
   platformStatus:
     gcp:
@@ -187,7 +191,7 @@ EOF
 
 resource "local_file" "cluster-infrastructure-02-config" {
   content  = data.template_file.cluster-infrastructure-02-config.rendered
-  filename = "${local.installer_workspace}/manifests/cluster-infrastructure-02-config.yml"
+  filename = "${path.root}/installer-files/manifests/cluster-infrastructure-02-config.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -209,7 +213,7 @@ EOF
 
 resource "local_file" "cluster-ingress-02-config" {
   content  = data.template_file.cluster-ingress-02-config.rendered
-  filename = "${local.installer_workspace}/manifests/cluster-ingress-02-config.yml"
+  filename = "${path.root}/installer-files/manifests/cluster-ingress-02-config.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -238,7 +242,7 @@ EOF
 
 resource "local_file" "cluster-network-02-config" {
   content  = data.template_file.cluster-network-02-config.rendered
-  filename = "${local.installer_workspace}/manifests/cluster-network-02-config.yml"
+  filename = "${path.root}/installer-files/manifests/cluster-network-02-config.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -274,7 +278,7 @@ resource "local_file" "cluster-network-02-config" {
 
 # resource "local_file" "etcd-host-service-endpoints" {
 #   content  = data.template_file.etcd-host-service-endpoints.rendered
-#   filename = "${local.installer_workspace}/manifests/etcd-host-service-endpoints.yaml"
+#   filename = "${path.root}/installer-files/manifests/etcd-host-service-endpoints.yaml"
 #   depends_on = [
 #     null_resource.download_binaries,
 #     null_resource.generate_manifests,
@@ -290,10 +294,10 @@ kind: Machine
 metadata:
   creationTimestamp: null
   labels:
-    machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
+    machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
     machine.openshift.io/cluster-api-machine-role: master
     machine.openshift.io/cluster-api-machine-type: master
-  name: ${var.cluster_id}-m-${count.index}
+  name: ${data.local_file.infrastructureID.content}-m-${count.index}
   namespace: openshift-machine-api
 spec:
   metadata:
@@ -308,27 +312,27 @@ spec:
       disks:
       - autoDelete: true
         boot: true
-        image: ${var.cluster_id}-rhcos-image
+        image: ${data.local_file.infrastructureID.content}-rhcos-image
         labels: null
         sizeGb: ${var.master_os_disk_size}
-        type: pd-ssd
+        type: ${var.master_os_disk_type}
       kind: GCPMachineProviderSpec
       machineType: ${var.master_vm_type}
       metadata:
         creationTimestamp: null
       networkInterfaces:
-      - network: ${var.cluster_id}-network
-        subnetwork: ${var.cluster_id}-master-subnet
+      - network: ${data.local_file.infrastructureID.content}-network
+        subnetwork: ${data.local_file.infrastructureID.content}-master-subnet
       projectID: ${var.project_id}
       region: ${var.gcp_region}
       serviceAccounts:
-      - email: ${var.cluster_id}-m@${var.project_id}.iam.gserviceaccount.com
+      - email: ${data.local_file.infrastructureID.content}-m@${var.project_id}.iam.gserviceaccount.com
         scopes:
         - https://www.googleapis.com/auth/cloud-platform
       tags:
-      - ${var.cluster_id}-master
+      - ${data.local_file.infrastructureID.content}-master
       targetPools:
-      - ${var.cluster_id}-api
+      - ${data.local_file.infrastructureID.content}-api
       userDataSecret:
         name: master-user-data
       zone: ${var.zones[count.index % length(var.zones)]}
@@ -339,7 +343,7 @@ EOF
 # resource "local_file" "openshift-cluster-api_master-machines" {
 #   count    = var.master_count
 #   content  = element(data.template_file.openshift-cluster-api_master-machines.*.rendered, count.index)
-#   filename = "${local.installer_workspace}/openshift/99_openshift-cluster-api_master-machines-${count.index}.yaml"
+#   filename = "${path.root}/installer-files/openshift/99_openshift-cluster-api_master-machines-${count.index}.yaml"
 #   depends_on = [
 #     null_resource.download_binaries,
 #     null_resource.generate_manifests,
@@ -355,23 +359,23 @@ kind: MachineSet
 metadata:
   creationTimestamp: null
   labels:
-    machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
-  name: ${var.cluster_id}-w-${replace(var.zones[count.index % length(var.zones)], "${var.gcp_region}-", "")}
+    machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
+  name: ${data.local_file.infrastructureID.content}-w-${replace(var.zones[count.index % length(var.zones)], "${var.gcp_region}-", "")}
   namespace: openshift-machine-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
-      machine.openshift.io/cluster-api-machineset: ${var.cluster_id}-w-${replace(var.zones[count.index % length(var.zones)], "${var.gcp_region}-", "")}
+      machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
+      machine.openshift.io/cluster-api-machineset: ${data.local_file.infrastructureID.content}-w-${replace(var.zones[count.index % length(var.zones)], "${var.gcp_region}-", "")}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
+        machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: ${var.cluster_id}-w-${replace(var.zones[count.index % length(var.zones)], "${var.gcp_region}-", "")}
+        machine.openshift.io/cluster-api-machineset: ${data.local_file.infrastructureID.content}-w-${replace(var.zones[count.index % length(var.zones)], "${var.gcp_region}-", "")}
     spec:
       metadata:
         creationTimestamp: null
@@ -385,25 +389,25 @@ spec:
           disks:
           - autoDelete: true
             boot: true
-            image: ${var.cluster_id}-rhcos-image
+            image: ${data.local_file.infrastructureID.content}-rhcos-image
             labels: null
             sizeGb: ${var.worker_os_disk_size}
-            type: pd-ssd
+            type: ${var.worker_os_disk_type}
           kind: GCPMachineProviderSpec
           machineType: ${var.worker_vm_type}
           metadata:
             creationTimestamp: null
           networkInterfaces:
-          - network: ${var.cluster_id}-network
-            subnetwork: ${var.cluster_id}-worker-subnet
+          - network: ${data.local_file.infrastructureID.content}-network
+            subnetwork: ${data.local_file.infrastructureID.content}-worker-subnet
           projectID: ${var.project_id}
           region: ${var.gcp_region}
           serviceAccounts:
-          - email: ${var.cluster_id}-w@${var.project_id}.iam.gserviceaccount.com
+          - email: ${data.local_file.infrastructureID.content}-w@${var.project_id}.iam.gserviceaccount.com
             scopes:
             - https://www.googleapis.com/auth/cloud-platform
           tags:
-          - ${var.cluster_id}-worker
+          - ${data.local_file.infrastructureID.content}-worker
           userDataSecret:
             name: worker-user-data
           zone: ${var.zones[count.index % length(var.zones)]}
@@ -415,7 +419,7 @@ EOF
 resource "local_file" "openshift-cluster-api_worker-machineset" {
   count    = var.master_count
   content  = element(data.template_file.openshift-cluster-api_worker-machineset.*.rendered, count.index)
-  filename = "${local.installer_workspace}/openshift/99_openshift-cluster-api_worker-machineset-${count.index}.yaml"
+  filename = "${path.root}/installer-files/openshift/99_openshift-cluster-api_worker-machineset-${count.index}.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -430,23 +434,23 @@ kind: MachineSet
 metadata:
   creationTimestamp: null
   labels:
-    machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
-  name: ${var.cluster_id}-i-${replace(var.zones[count.index % length(var.zones)], "-${var.gcp_region}", "")}
+    machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
+  name: ${data.local_file.infrastructureID.content}-i-${replace(var.zones[count.index % length(var.zones)], "-${var.gcp_region}", "")}
   namespace: openshift-machine-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
-      machine.openshift.io/cluster-api-machineset: ${var.cluster_id}-i-${replace(var.zones[count.index % length(var.zones)], "-${var.gcp_region}", "")}
+      machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
+      machine.openshift.io/cluster-api-machineset: ${data.local_file.infrastructureID.content}-i-${replace(var.zones[count.index % length(var.zones)], "-${var.gcp_region}", "")}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        machine.openshift.io/cluster-api-cluster: ${var.cluster_id}
+        machine.openshift.io/cluster-api-cluster: ${data.local_file.infrastructureID.content}
         machine.openshift.io/cluster-api-machine-role: infra
         machine.openshift.io/cluster-api-machine-type: infra
-        machine.openshift.io/cluster-api-machineset: ${var.cluster_id}-i-${replace(var.zones[count.index % length(var.zones)], "-${var.gcp_region}", "")}
+        machine.openshift.io/cluster-api-machineset: ${data.local_file.infrastructureID.content}-i-${replace(var.zones[count.index % length(var.zones)], "-${var.gcp_region}", "")}
     spec:
       metadata:
         creationTimestamp: null
@@ -460,25 +464,25 @@ spec:
           disks:
           - autoDelete: true
             boot: true
-            image: ${var.cluster_id}-rhcos-image
+            image: ${data.local_file.infrastructureID.content}-rhcos-image
             labels: null
             sizeGb: ${var.infra_os_disk_size}
-            type: pd-ssd
+            type: ${var.infra_os_disk_type}
           kind: GCPMachineProviderSpec
           machineType: ${var.infra_vm_type}
           metadata:
             creationTimestamp: null
           networkInterfaces:
-          - network: ${var.cluster_id}-network
-            subnetwork: ${var.cluster_id}-worker-subnet
+          - network: ${data.local_file.infrastructureID.content}-network
+            subnetwork: ${data.local_file.infrastructureID.content}-worker-subnet
           projectID: ${var.project_id}
           region: ${var.gcp_region}
           serviceAccounts:
-          - email: ${var.cluster_id}-w@${var.project_id}.iam.gserviceaccount.com
+          - email: ${data.local_file.infrastructureID.content}-w@${var.project_id}.iam.gserviceaccount.com
             scopes:
             - https://www.googleapis.com/auth/cloud-platform
           tags:
-          - ${var.cluster_id}-worker
+          - ${data.local_file.infrastructureID.content}-worker
           userDataSecret:
             name: worker-user-data
           zone: ${var.zones[count.index % length(var.zones)]}
@@ -490,7 +494,7 @@ EOF
 resource "local_file" "openshift-cluster-api_infra-machineset" {
   count    = var.infra_count
   content  = element(data.template_file.openshift-cluster-api_infra-machineset.*.rendered, count.index)
-  filename = "${local.installer_workspace}/openshift/99_openshift-cluster-api_infra-machineset-${count.index}.yaml"
+  filename = "${path.root}/installer-files/openshift/99_openshift-cluster-api_infra-machineset-${count.index}.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -523,7 +527,7 @@ EOF
 
 resource "local_file" "ingresscontroller-default" {
   content  = data.template_file.ingresscontroller-default.rendered
-  filename = "${local.installer_workspace}/openshift/99_default_ingress_controller.yaml"
+  filename = "${path.root}/installer-files/openshift/99_default_ingress_controller.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -547,7 +551,7 @@ EOF
 
 resource "local_file" "cluster-scheduler-02-config" {
   content  = data.template_file.cluster-scheduler-02-config.rendered
-  filename = "${local.installer_workspace}/manifests/cluster-scheduler-02-config.yml"
+  filename = "${path.root}/installer-files/manifests/cluster-scheduler-02-config.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -590,7 +594,7 @@ EOF
 resource "local_file" "cluster-monitoring-configmap" {
   count    = var.infra_count > 0 ? 1 : 0
   content  = data.template_file.cluster-monitoring-configmap.rendered
-  filename = "${local.installer_workspace}/openshift/99_cluster-monitoring-configmap.yml"
+  filename = "${path.root}/installer-files/openshift/99_cluster-monitoring-configmap.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -655,7 +659,7 @@ EOF
 
 resource "local_file" "configure-image-registry-job" {
   content  = data.template_file.configure-image-registry-job.rendered
-  filename = "${local.installer_workspace}/openshift/99_configure-image-registry-job.yml"
+  filename = "${path.root}/installer-files/openshift/99_configure-image-registry-job.yml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -683,7 +687,7 @@ EOF
 resource "local_file" "airgapped_registry_upgrades" {
   count    = var.airgapped["enabled"] ? 1 : 0
   content  = element(data.template_file.airgapped_registry_upgrades.*.rendered, count.index)
-  filename = "${local.installer_workspace}/openshift/99_airgapped_registry_upgrades.yaml"
+  filename = "${path.root}/installer-files/openshift/99_airgapped_registry_upgrades.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
@@ -704,9 +708,34 @@ EOF
 
 resource "local_file" "cloud-creds-secret" {
   content  = data.template_file.cloud-creds-secret.rendered
-  filename = "${local.installer_workspace}/openshift/99_cloud-creds-secret.yaml"
+  filename = "${path.root}/installer-files/openshift/99_cloud-creds-secret.yaml"
   depends_on = [
     null_resource.download_binaries,
     null_resource.generate_manifests,
   ]
 }
+
+resource "null_resource" "extractInfrastructureID" {
+  depends_on = [
+    null_resource.generate_manifests
+  ]
+
+  provisioner "local-exec" {
+    when    = create
+    command = "cat ${path.root}/installer-files/temp/.openshift_install_state.json | jq -r '.\"*installconfig.ClusterID\".InfraID' | tr -d '\n' > ${path.root}/installer-files/infraID"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "rm -rf ${path.root}/installer-files/infraID"
+  }
+}
+
+
+data "local_file" "infrastructureID" {
+  depends_on = [
+    null_resource.extractInfrastructureID
+  ]
+  filename        =  "${path.root}/installer-files/infraID"
+}
+

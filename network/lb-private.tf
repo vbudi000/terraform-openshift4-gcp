@@ -4,8 +4,14 @@ resource "google_compute_address" "cluster_ip" {
   subnetwork   = local.master_subnet
 }
 
+// Refer to docs/dev/kube-apiserver-health-check.md on how to correctly setup health check probe for kube-apiserver
 resource "google_compute_health_check" "api_internal" {
   name = "${var.cluster_id}-api-internal"
+
+  healthy_threshold   = 3
+  unhealthy_threshold = 3
+  check_interval_sec  = 2
+  timeout_sec         = 2
 
   https_health_check {
     port         = 6443

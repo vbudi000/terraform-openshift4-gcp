@@ -22,3 +22,5 @@ makefile
 # installer-files
 **/installer-files/*
 **/reference/*
+.terraform.lock.hcl
+openshift_pull_secret.json

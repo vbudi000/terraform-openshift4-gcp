@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    ignition = {
+      source = "community-terraform-providers/ignition"
+      version = "2.1.2"
+    }
+  }
+}
+
 resource "google_service_account" "master-node-sa" {
   account_id   = "${var.cluster_id}-m"
   display_name = "${var.cluster_id}-master-node"
@@ -69,9 +78,9 @@ resource "google_compute_instance" "master" {
 }
 
 resource "google_compute_instance_group" "master" {
-  count = var.instance_count >= length(var.zones) ? length(var.zones) : var.instance_count
+  count = length(var.zones)
 
-  name = "${var.cluster_id}-master-${var.zones[count.index % length(var.zones)]}"
+  name = "${var.cluster_id}-master-${var.zones[count.index]}"
   #network = var.network
   zone = var.zones[count.index]
 

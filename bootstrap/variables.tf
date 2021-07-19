@@ -57,10 +57,14 @@ variable "root_volume_size" {
 variable "root_volume_type" {
   type        = string
   description = "The volume type for the bootstrap node's root volume."
-  default     = "pd-ssd"
 }
 
 variable "zone" {
   type        = string
   description = "The zone for the bootstrap node."
+}
+
+variable "region" {
+  type        = string
+  description = "The region for the bootstrap node."
 }

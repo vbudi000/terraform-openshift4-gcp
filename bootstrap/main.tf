@@ -1,3 +1,35 @@
+terraform {
+  required_providers {
+    ignition = {
+      source = "community-terraform-providers/ignition"
+      version = "2.1.2"
+    }
+  }
+}
+
+resource "google_storage_bucket" "ignition" {
+  name     = "${var.cluster_id}-bootstrap-ignition"
+  location = var.region
+}
+
+resource "google_storage_bucket_object" "ignition" {
+  bucket  = google_storage_bucket.ignition.name
+  name    = "bootstrap.ign"
+  content = var.ignition
+}
+
+data "google_storage_object_signed_url" "ignition_url" {
+  bucket   = google_storage_bucket.ignition.name
+  path     = "bootstrap.ign"
+  duration = "1h"
+}
+
+data "ignition_config" "redirect" {
+  replace {
+    source = data.google_storage_object_signed_url.ignition_url.signed_url
+  }
+}
+
 resource "google_compute_address" "bootstrap" {
   name = "${var.cluster_id}-bootstrap-ip"
 
@@ -21,7 +53,7 @@ resource "google_compute_firewall" "bootstrap_ingress_ssh" {
 resource "google_compute_instance" "bootstrap" {
   count = var.bootstrap_enabled ? 1 : 0
 
-  name         = "${var.cluster_id}-bastion"
+  name         = "${var.cluster_id}-bootstrap"
   machine_type = var.machine_type
   zone         = var.zone
 
@@ -47,7 +79,7 @@ resource "google_compute_instance" "bootstrap" {
   }
 
   metadata = {
-    user-data = var.ignition
+    user-data = data.ignition_config.redirect.rendered
   }
 
   tags = ["${var.cluster_id}-master", "${var.cluster_id}-bootstrap"]

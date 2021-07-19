@@ -9,3 +9,7 @@ output "master_ignition" {
 output "worker_ignition" {
   value = data.ignition_config.worker_redirect.rendered
 }
+
+output "infraID" {
+    value =  data.local_file.infrastructureID.content
+}

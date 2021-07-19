@@ -1,6 +1,6 @@
-variable "cluster_id" {
-  type = string
-}
+#variable "cluster_id" {
+#  type = string
+#}
 
 variable "project_id" {
   type = string
@@ -92,6 +92,21 @@ variable "master_os_disk_size" {
   default = 1024
 }
 
+variable "master_os_disk_type" {
+  type    = string
+  default = "pd-ssd"
+}
+
+variable "worker_os_disk_type" {
+  type    = string
+  default = "pd-ssd"
+}
+
+variable "infra_os_disk_type" {
+  type    = string
+  default = "pd-ssd"
+}
+
 variable "zones" {
   type = list(string)
 }
@@ -110,4 +125,15 @@ variable "airgapped" {
     enabled    = false
     repository = ""
   }
+}
+
+variable "additional_trust_bundle" {
+  type = string
+  default = ""
+}
+
+variable "openshift_ssh_key" {
+  type        = string
+  description = "SSH key for OpenShift nodes"
+  default     = ""
 }
